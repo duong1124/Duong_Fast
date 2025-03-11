@@ -261,8 +261,8 @@ class kNN:
         self.x_list = np.unique(self.X[:, 0])       # For uuCF, x -> user
         self.y_list = np.unique(self.X[:, 1])       # For uuCF, y -> item
 
-        self.n_x = len(self.x_list)
-        self.n_y = len(self.y_list)
+        self.n_x = max(xid for xid,_ ,_ in self.X) + 1
+        self.n_y = max(yid for _, yid,_ in self.X) + 1
 
     @timer("Listing took ")
     def list_ur_ir(self):
