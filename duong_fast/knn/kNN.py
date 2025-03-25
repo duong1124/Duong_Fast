@@ -133,6 +133,7 @@ class kNN:
         mse = np.mean((self.predictions[:, 2] - self.predictions[:, 3])**2)
         rmse_ = np.sqrt(mse)
         print(f"RMSE: {rmse_:.5f}")
+        return rmse_
 
     def mae(self):
         """Calculate Mean Absolute Error between the predictions and the ground truth.
@@ -140,6 +141,7 @@ class kNN:
         """
         mae_ = np.mean(np.abs(self.predictions[:, 2] - self.predictions[:, 3]))
         print(f"MAE: {mae_:.5f}")
+        return mae_
 
     def precision_recall_at_k(self, k=10, threshold=3.5):
         """Calculate the precision and recall at k metrics.
