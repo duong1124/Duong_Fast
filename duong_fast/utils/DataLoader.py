@@ -123,3 +123,64 @@ class DataLoader:
         genome.fillna(0, inplace=True)
 
         return sparse.csr_matrix((genome['score'], (genome['i_id'].astype(int), genome['g_id'].astype(int)))).toarray()
+    
+    def load_item_features_fromcsv(self, item_features_csv):
+        """
+        Map item features from CSV file (indexed by itemId) to item_idx.
+
+        Args:
+            item_features_csv: Path to the CSV file containing item features.
+
+        Returns:
+            item_latent_matrix (np.array): Rows correspond to item_idx (from 0 to ...)
+                        and columns correspond to the latent factors of the items.
+        """
+        item_features = pd.read_csv(item_features_csv, header=None, index_col=0)  # Index is itemId
+
+        # Map itemId to item_idx
+        item_features['item_idx'] = item_features.index.map(self.item_dict)
+
+        # Drop rows with itemId not found in self.item_dict
+        item_features = item_features.dropna(subset=['item_idx'])
+        item_features['item_idx'] = item_features['item_idx'].astype(int)
+
+        # Sort by item_idx (from 0 to ...)
+        item_features = item_features.set_index('item_idx').sort_index()
+
+        # Extract the features (all columns except 'item_idx')
+        item_latent_matrix = item_features.iloc[:, :-1].to_numpy()
+
+        return item_latent_matrix
+    
+    def calculate_user_latent_matrix(self, item_latent_matrix):
+        """
+        Calculate user latent matrix based on the ratings and item latent vector.
+
+        Args:
+            item_latent_matrix (np.array): Row corresponds to the feature vector of a item (Q_i).
+
+        Returns:
+            user_latent_matrix (np.array): Row corresponds to the profile vector of a user (P_u).
+        """
+        num_users = len(self.user_dict)
+        latent_dim = item_latent_matrix.shape[1]
+        user_latent_matrix = np.zeros((num_users, latent_dim))
+
+        for user_id, user_idx in self.user_dict.items():
+            # Get all movies rated by the user
+            user_ratings = self.__train_data[self.__train_data[:, 0] == user_idx]
+            if user_ratings.size == 0:
+                continue
+
+            # Extract movie indices and ratings
+            movie_indices = user_ratings[:, 1]
+            ratings = user_ratings[:, 2]
+
+            # Normalize ratings to [0, 1] - min-max scaling or divided by 5 ?
+            normalized_ratings = ratings / 5.0
+            # normalized_ratings = (ratings - ratings.min()) / (ratings.max() - ratings.min()) if ratings.max() > ratings.min() else ratings
+            
+            # P_u = (1 / |R(u)|) * sum (r_ui * Q_i)
+            user_latent_matrix[user_idx] = np.sum(normalized_ratings[:, None] * item_latent_matrix[movie_indices.astype(int)], axis=0) / len(movie_indices)
+
+        return user_latent_matrix
