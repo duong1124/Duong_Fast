@@ -130,33 +130,30 @@ class DataLoader:
         and filter only items present in the train_set.
 
         Args:
-            item_features_csv: Path to the CSV file containing item features.
+            item_features_csv: Path to the CSV file containing item features. ['itemId', 'feature's...]
             train_set (np.array)
 
         Returns:
-            item_latent_matrix (np.array): Rows correspond to item_idx (from 0 to ...)
-                        and columns correspond to the latent factors of the items.
+            item_latent_matrix (np.array): Rows ~ item_idx (from 0 to ...), Cols ~ features.
         """
         item_features = pd.read_csv(item_features_csv, header=None, index_col=0)  # Index is itemId
 
-        # Map itemId to item_idx
+        # Map itemId to item_idx as a new column
         item_features['item_idx'] = item_features.index.map(self.item_dict)
 
-        # Get unique item IDs from train_set
-        train_item_ids = np.unique(train_set[:, 1])  # Column 1 contains item IDs
+        train_item_idx = np.unique(train_set[:, 1])
 
         # Filter item_features to include only items in train_set
-        item_features = item_features[item_features['item_idx'].isin(train_item_ids)]
+        item_features = item_features[item_features['item_idx'].isin(train_item_idx)]
 
         # Drop rows with itemId not found in self.item_dict
         item_features = item_features.dropna(subset=['item_idx'])
         item_features['item_idx'] = item_features['item_idx'].astype(int)
 
-        # Sort by item_idx (from 0 to ...)
+        # set item_idx as index and sort by item_idx
         item_features = item_features.set_index('item_idx').sort_index()
 
-        # Extract the features (all columns except 'item_idx')
-        item_latent_matrix = item_features.iloc[:, :-1].to_numpy()
+        item_latent_matrix = item_features.to_numpy()
 
         return item_latent_matrix
 
@@ -172,17 +169,17 @@ class DataLoader:
         Returns:
             user_latent_matrix (np.array): Row corresponds to the profile vector of a user (P_u).
         """
-        # Get unique user IDs from train_set
-        train_user_ids = np.unique(train_set[:, 0])  # Column 0 contains user IDs
+        
+        train_user_idx = np.unique(train_set[:, 0])
 
         # Filter user_dict to include only users in train_set
-        filtered_user_dict = {user_id: user_idx for user_id, user_idx in self.user_dict.items() if user_idx in train_user_ids}
+        train_user_dict = {user_id: user_idx for user_id, user_idx in self.user_dict.items() if user_idx in train_user_idx}
 
-        num_users = len(filtered_user_dict)
+        num_users = len(train_user_dict)
         latent_dim = item_latent_matrix.shape[1]
         user_latent_matrix = np.zeros((num_users, latent_dim))
 
-        for user_id, user_idx in filtered_user_dict.items():
+        for user_id, user_idx in train_user_dict.items():
             # Get all movies rated by the user
             user_ratings = train_set[train_set[:, 0] == user_idx]
             if user_ratings.size == 0:
