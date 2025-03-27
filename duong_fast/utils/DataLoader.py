@@ -124,12 +124,14 @@ class DataLoader:
 
         return sparse.csr_matrix((genome['score'], (genome['i_id'].astype(int), genome['g_id'].astype(int)))).toarray()
     
-    def load_item_features_fromcsv(self, item_features_csv):
+    def load_item_features_fromcsv(self, item_features_csv, train_set):
         """
-        Map item features from CSV file (indexed by itemId) to item_idx.
+        Map item features from CSV file (indexed by itemId) to item_idx, 
+        and filter only items present in the train_set.
 
         Args:
             item_features_csv: Path to the CSV file containing item features.
+            train_set (np.array)
 
         Returns:
             item_latent_matrix (np.array): Rows correspond to item_idx (from 0 to ...)
@@ -139,6 +141,12 @@ class DataLoader:
 
         # Map itemId to item_idx
         item_features['item_idx'] = item_features.index.map(self.item_dict)
+
+        # Get unique item IDs from train_set
+        train_item_ids = np.unique(train_set[:, 1])  # Column 1 contains item IDs
+
+        # Filter item_features to include only items in train_set
+        item_features = item_features[item_features['item_idx'].isin(train_item_ids)]
 
         # Drop rows with itemId not found in self.item_dict
         item_features = item_features.dropna(subset=['item_idx'])
@@ -151,24 +159,32 @@ class DataLoader:
         item_latent_matrix = item_features.iloc[:, :-1].to_numpy()
 
         return item_latent_matrix
-    
-    def calculate_user_latent_matrix(self, item_latent_matrix):
+
+    def calculate_user_latent_matrix(self, item_latent_matrix, train_set):
         """
-        Calculate user latent matrix based on the ratings and item latent vector.
+        Calculate user latent matrix based on the ratings and item latent vector,
+        and filter only users present in the train_set.
 
         Args:
-            item_latent_matrix (np.array): Row corresponds to the feature vector of a item (Q_i).
+            item_latent_matrix (np.array): Row corresponds to the feature vector of an item (Q_i).
+            train_set (np.array)
 
         Returns:
             user_latent_matrix (np.array): Row corresponds to the profile vector of a user (P_u).
         """
-        num_users = len(self.user_dict)
+        # Get unique user IDs from train_set
+        train_user_ids = np.unique(train_set[:, 0])  # Column 0 contains user IDs
+
+        # Filter user_dict to include only users in train_set
+        filtered_user_dict = {user_id: user_idx for user_id, user_idx in self.user_dict.items() if user_idx in train_user_ids}
+
+        num_users = len(filtered_user_dict)
         latent_dim = item_latent_matrix.shape[1]
         user_latent_matrix = np.zeros((num_users, latent_dim))
 
-        for user_id, user_idx in self.user_dict.items():
+        for user_id, user_idx in filtered_user_dict.items():
             # Get all movies rated by the user
-            user_ratings = self.__train_data[self.__train_data[:, 0] == user_idx]
+            user_ratings = train_set[train_set[:, 0] == user_idx]
             if user_ratings.size == 0:
                 continue
 
@@ -179,7 +195,7 @@ class DataLoader:
             # Normalize ratings to [0, 1] - min-max scaling or divided by 5 ?
             normalized_ratings = ratings / 5.0
             # normalized_ratings = (ratings - ratings.min()) / (ratings.max() - ratings.min()) if ratings.max() > ratings.min() else ratings
-            
+
             # P_u = (1 / |R(u)|) * sum (r_ui * Q_i)
             user_latent_matrix[user_idx] = np.sum(normalized_ratings[:, None] * item_latent_matrix[movie_indices.astype(int)], axis=0) / len(movie_indices)
 
