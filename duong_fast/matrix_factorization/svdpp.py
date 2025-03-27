@@ -106,7 +106,7 @@ class SVDpp(SVD):
         self.items_list = np.unique(X[:, 1])
 
         if X_val is not None:
-            self.metrics_ = np.zeros((self.n_epochs, 3), dtype=np.float)
+            self.metrics_ = np.zeros((self.n_epochs, 3), dtype=float)
 
         self.global_mean = np.mean(X[:, 2])
 
@@ -174,7 +174,7 @@ class SVDpp(SVD):
         self.items_list = np.unique(self.X[:, 1])
 
         if X_val is not None:
-            self.metrics_ = np.zeros((self.n_epochs, 3), dtype=np.float)
+            self.metrics_ = np.zeros((self.n_epochs, 3), dtype=float)
 
         self.global_mean = np.mean(X[:, 2])
 
