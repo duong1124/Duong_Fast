@@ -139,7 +139,7 @@ class SVD:
 
         if X_val is not None:
             X_val = X_val.copy()
-            self.metrics_ = np.zeros((self.n_epochs, 3), dtype=np.float)
+            self.metrics_ = np.zeros((self.n_epochs, 3), dtype=float)
 
         self.global_mean = np.mean(X[:, 2])
 
@@ -204,7 +204,7 @@ class SVD:
         print(f"Load checkpoint from {checkpoint} successfully.")
 
         if X_val is not None:
-            self.metrics_ = np.zeros((self.n_epochs, 3), dtype=np.float)
+            self.metrics_ = np.zeros((self.n_epochs, 3), dtype=float)
 
         self.global_mean = np.mean(X[:, 2])
 
