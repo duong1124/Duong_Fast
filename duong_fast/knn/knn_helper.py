@@ -159,6 +159,8 @@ def _calculate_precision_recall(user_ratings, k, threshold):
     
     # Extract ratings
     for i in range(n_ratings):
+        # Assume user_ratings[i] is a tuple/array with two elements
+        # If it's not, this will raise an error that we need to handle at the caller level
         pred_ratings[i] = user_ratings[i][0]
         true_ratings[i] = user_ratings[i][1]
     

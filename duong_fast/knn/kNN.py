@@ -170,7 +170,15 @@ class kNN:
         recalls = np.zeros(n_users)
 
         for u_id, user_ratings in enumerate(user_est_true):
-            precisions[u_id], recalls[u_id] = _calculate_precision_recall(np.array(user_ratings), k, threshold)
+            if len(user_ratings) > 0:
+                # Convert to numpy array and ensure it's 2D
+                ratings_array = np.array(user_ratings, dtype=np.float64)
+                if ratings_array.ndim == 1:
+                    ratings_array = ratings_array.reshape(1, -1)
+                precisions[u_id], recalls[u_id] = _calculate_precision_recall(ratings_array, k, threshold)
+            else:
+                precisions[u_id] = 0.0
+                recalls[u_id] = 0.0
 
         precision = sum(prec for prec in precisions) / n_users
         recall = sum(rec for rec in recalls) / n_users
