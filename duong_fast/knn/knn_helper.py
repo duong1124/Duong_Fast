@@ -149,32 +149,40 @@ def _calculate_precision_recall(user_ratings, k, threshold):
     Returns:
         (precision, recall): the precision and recall score for the user.
     """
-    # Sort user ratings by estimated value
     n_ratings = len(user_ratings)
     if n_ratings == 0:
         return 0.0, 0.0
         
-    # Extract predicted ratings and sort
-    pred_ratings = np.array([r[0] for r in user_ratings])
+    # Create arrays for predicted and true ratings
+    pred_ratings = np.zeros(n_ratings)
+    true_ratings = np.zeros(n_ratings)
+    
+    # Extract ratings
+    for i in range(n_ratings):
+        pred_ratings[i] = user_ratings[i][0]
+        true_ratings[i] = user_ratings[i][1]
+    
+    # Sort by predicted ratings
     sort_idx = np.argsort(pred_ratings)[::-1]
-    user_ratings = user_ratings[sort_idx]
+    pred_ratings = pred_ratings[sort_idx]
+    true_ratings = true_ratings[sort_idx]
 
     # Number of relevant items
     n_rel = 0
-    for _, true_r in user_ratings:
-        if true_r >= threshold:
+    for i in range(n_ratings):
+        if true_ratings[i] >= threshold:
             n_rel += 1
 
     # Number of recommended items in top k
     n_rec_k = 0
-    for est, _ in user_ratings[:min(k, n_ratings)]:
-        if est >= threshold:
+    for i in range(min(k, n_ratings)):
+        if pred_ratings[i] >= threshold:
             n_rec_k += 1
 
     # Number of relevant and recommended items in top k
     n_rel_and_rec_k = 0
-    for (est, true_r) in user_ratings[:min(k, n_ratings)]:
-        if true_r >= threshold and est >= threshold:
+    for i in range(min(k, n_ratings)):
+        if true_ratings[i] >= threshold and pred_ratings[i] >= threshold:
             n_rel_and_rec_k += 1
 
     # Precision@K: Proportion of recommended items that are relevant
