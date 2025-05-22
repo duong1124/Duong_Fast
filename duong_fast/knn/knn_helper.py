@@ -138,14 +138,14 @@ def _predict_baseline(x_id, y_id, x_rated_y, S, k, k_min, global_mean, bx, by):
     return est
 
 @njit
-def _calculate_precision_recall(user_ratings, k, threshold):
+def _calculate_precision_recall(user_ratings, k, threshold, top_k_ranking_metric):
     """Calculate the precision and recall at k metric for the user based on his/her obversed rating and his/her predicted rating.
 
     Args:
         user_ratings (ndarray): An array contains the predicted rating in the first column and the obversed rating in the second column.
         k (int): the k metric.
         threshold (float): relevant threshold.
-
+        top_k_ranking_metric (bool): use k (instead of n_rec_k) for precision.
     Returns:
         (precision, recall): the precision and recall score for the user.
     """
@@ -153,14 +153,10 @@ def _calculate_precision_recall(user_ratings, k, threshold):
     if n_ratings == 0:
         return 0.0, 0.0
         
-    # Create arrays for predicted and true ratings
     pred_ratings = np.zeros(n_ratings)
     true_ratings = np.zeros(n_ratings)
     
-    # Extract ratings
     for i in range(n_ratings):
-        # Assume user_ratings[i] is a tuple/array with two elements
-        # If it's not, this will raise an error that we need to handle at the caller level
         pred_ratings[i] = user_ratings[i][0]
         true_ratings[i] = user_ratings[i][1]
     
@@ -170,27 +166,26 @@ def _calculate_precision_recall(user_ratings, k, threshold):
     true_ratings = true_ratings[sort_idx]
 
     # Number of relevant items
-    n_rel = 0
-    for i in range(n_ratings):
-        if true_ratings[i] >= threshold:
-            n_rel += 1
+    n_rel = np.sum(true_ratings[:min(k, n_ratings)] >= threshold)
 
-    # Number of recommended items in top k
-    n_rec_k = 0
-    for i in range(min(k, n_ratings)):
-        if pred_ratings[i] >= threshold:
-            n_rec_k += 1
+    # Number of recommended items
+    n_rec_k = np.sum(pred_ratings[:min(k, n_ratings)] >= threshold)
 
     # Number of relevant and recommended items in top k
     n_rel_and_rec_k = 0
-    for i in range(min(k, n_ratings)):
-        if true_ratings[i] >= threshold and pred_ratings[i] >= threshold:
-            n_rel_and_rec_k += 1
+    if top_k_ranking_metric:
+        n_rel_and_rec_k = np.sum(true_ratings[:min(k, n_ratings)] >= threshold)
+    else:
+        n_rel_and_rec_k = np.sum((true_ratings[:min(k, n_ratings)] >= threshold) & \
+                         (pred_ratings[:min(k, n_ratings)] >= threshold))
 
     # Precision@K: Proportion of recommended items that are relevant
     # When n_rec_k is 0, Precision is undefined. We here set it to 0.
     if n_rec_k != 0:
-        precision = n_rel_and_rec_k / n_rec_k
+        if top_k_ranking_metric:
+            precision = n_rel_and_rec_k / k
+        else:
+            precision = n_rel_and_rec_k / n_rec_k
     else:
         precision = 0
 
