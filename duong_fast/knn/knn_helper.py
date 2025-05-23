@@ -167,6 +167,7 @@ def _calculate_precision_recall(user_ratings, k, threshold, top_k_ranking_metric
 
     # Number of relevant items
     n_rel = np.sum(true_ratings[:min(k, n_ratings)] >= threshold)
+    n_rel_top_k = np.sum(true_ratings >= threshold) # for top k ranking, this is n_rel on whole test set
 
     # Number of recommended items
     n_rec_k = np.sum(pred_ratings[:min(k, n_ratings)] >= threshold)
@@ -174,7 +175,7 @@ def _calculate_precision_recall(user_ratings, k, threshold, top_k_ranking_metric
     # Number of relevant and recommended items in top k
     n_rel_and_rec_k = 0
     if top_k_ranking_metric:
-        n_rel_and_rec_k = np.sum(true_ratings[:min(k, n_ratings)] >= threshold)
+        n_rel_and_rec_k = n_rel # = true_ratings >= threshold in first k rec by predicted ratings
     else:
         n_rel_and_rec_k = np.sum((true_ratings[:min(k, n_ratings)] >= threshold) & \
                          (pred_ratings[:min(k, n_ratings)] >= threshold))
@@ -192,7 +193,10 @@ def _calculate_precision_recall(user_ratings, k, threshold, top_k_ranking_metric
     # Recall@K: Proportion of relevant items that are recommended
     # When n_rel is 0, Recall is undefined. We here set it to 0.
     if n_rel != 0:
-        recall = n_rel_and_rec_k / n_rel
+        if top_k_ranking_metric:
+            recall = n_rel_and_rec_k / n_rel_top_k
+        else:
+            recall = n_rel_and_rec_k / n_rel
     else:
         recall = 0
 
