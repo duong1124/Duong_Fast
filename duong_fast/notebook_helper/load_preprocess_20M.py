@@ -2,6 +2,8 @@ import os
 import urllib.request
 import zipfile
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 class LoadPreprocess20M:
     def dataload(self, dataset_url="http://files.grouplens.org/datasets/movielens/ml-20m.zip", dataset_path="ml-20m.zip", extract_path="ml-20m"):
@@ -73,3 +75,55 @@ class LoadPreprocess20M:
             return final_movies, final_genome_scores, final_tags, final_genome_tags, final_ratings, final_links, tag_mapping
         
         return final_movies, final_genome_scores, final_ratings, tag_mapping
+    
+    @staticmethod
+    def draw_user_ratings_distribution(df_ratings, method='mean', plot_type='histogram', bins=50):
+        """
+        Plots the distribution of user ratings (mean/median) across all users from MovieLens 20M.
+
+        Args:
+            df_ratings (pd.DataFrame): DataFrame with 'userId' and 'rating' columns.
+            method (str): Aggregation method ('mean' or 'median'). Defaults to 'mean'.
+            percentiles (list): Percentiles to calculate. Defaults to [25, 50, 75].
+            plot_type (str): Type of plot ('histogram', 'kde', or 'boxplot'). Defaults to 'histogram'.
+            bins (int): Number of bins for the histogram. Defaults to 50.
+        """
+
+        if method not in ['mean', 'median']:
+            raise ValueError("Method should be 'mean' or 'median'.")
+
+        if method == 'mean':
+            user_aggregated_ratings = df_ratings.groupby('userId')['rating'].mean()
+            title_suffix = "Mean Rating"
+        else:  # method == 'median'
+            user_aggregated_ratings = df_ratings.groupby('userId')['rating'].median()
+            title_suffix = "Median Rating"
+
+        print(f"Descriptive for {method} ratings:\n{user_aggregated_ratings.describe()}")
+
+        plt.figure(figsize=(12, 6))
+
+        if plot_type == 'histogram':
+            sns.histplot(user_aggregated_ratings, bins=bins, kde=True)
+            plt.title(f'Distribution of User {title_suffix}', fontsize=16)
+            plt.xlabel(f'User {title_suffix}', fontsize=12)
+            plt.ylabel('Number of Users', fontsize=12)
+
+        elif plot_type == 'kde':
+            sns.kdeplot(user_aggregated_ratings, fill=True)
+            plt.title(f'Kernel Density Estimate of User {title_suffix}', fontsize=16)
+            plt.xlabel(f'User {title_suffix}', fontsize=12)
+            plt.ylabel('Density', fontsize=12)
+
+        elif plot_type == 'boxplot':
+            plt.boxplot(user_aggregated_ratings, vert=False)
+            plt.title(f'Box Plot of User {title_suffix}', fontsize=16)
+            plt.xlabel(f'User {title_suffix}', fontsize=12)
+            plt.yticks([])
+
+        else:
+            raise ValueError("Plot_type should be 'histogram', 'kde', or 'boxplot'.")
+
+        plt.grid(axis='y', alpha=0.75)
+        plt.tight_layout()
+        plt.show()
