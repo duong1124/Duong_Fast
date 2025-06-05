@@ -32,11 +32,31 @@ class SampleRatings:
         return gen_file, sample_user_ids
 
     @staticmethod
-    def find_max_min_users_rated(self):
-        pass
-    
+    def find_max_min_users_rated(df_ratings, sampled_movieIds=None):
+        """
+        Find movie with max/min number of users rated.
+        sampled_movieIds: optional subset of movies to consider.
+        Returns: (movieId_max, movieId_min)
+        """
+        if sampled_movieIds is not None and len(sampled_movieIds) > 0:
+            df_ratings_subset = df_ratings[df_ratings['movieId'].isin(sampled_movieIds)]
+        else:
+            df_ratings_subset = df_ratings
+        
+        movie_ratings_count = df_ratings_subset.groupby('movieId')['rating'].count()
+        max_users = movie_ratings_count.max()
+        min_users = movie_ratings_count.min()
+
+        movie_rated_max_users = movie_ratings_count[movie_ratings_count == max_users].index[0]
+        movie_rated_min_users = movie_ratings_count[movie_ratings_count == min_users].index[0]
+
+        print(f"Max users rated one movie: {max_users}, movieId: {movie_rated_max_users}")
+        print(f"Min users rated one movie: {min_users}, movieId: {movie_rated_min_users}")
+
+        return movie_rated_max_users, movie_rated_min_users
+
     @staticmethod
-    def find_max_min_movies_rated(self, df_ratings, sampled_userIds=None):
+    def find_max_min_movies_rated(df_ratings, sampled_userIds=None):
         """
         Find user with max/min number of movies rated.
         userIds: optional subset of users to consider.
