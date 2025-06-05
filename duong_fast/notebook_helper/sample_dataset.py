@@ -17,9 +17,9 @@ class SampleRatings:
         userIds = pd.Series(self.df_ratings['userId'].unique())
         sample_size = int(len(userIds) * self.sample_percent)
 
-        if self.method == 'random':
+        if self.sample_method == 'random':
             sample_user_ids = userIds.sample(n=sample_size, random_state=self.random_state)
-        elif self.method == 'first':
+        elif self.sample_method == 'first':
             sample_user_ids = userIds.iloc[:sample_size]
         else:
             raise ValueError("method must be 'random' or 'first'")
@@ -31,6 +31,35 @@ class SampleRatings:
 
         return gen_file, sample_user_ids
 
+    @staticmethod
+    def find_max_min_users_rated(self):
+        pass
+    
+    @staticmethod
+    def find_max_min_movies_rated(self, df_ratings, sampled_userIds=None):
+        """
+        Find user with max/min number of movies rated.
+        userIds: optional subset of users to consider.
+        Returns: (userId_max, userId_min)
+        """
+        if sampled_userIds is not None and len(sampled_userIds) > 0:
+            df_ratings_subset = df_ratings[df_ratings['userId'].isin(sampled_userIds)]
+        else:
+            df_ratings_subset = df_ratings
+        
+        user_ratings_count = df_ratings_subset.groupby('userId')['rating'].count()
+        max_movies = user_ratings_count.max()
+        min_movies = user_ratings_count.min()
+
+        user_rated_max_movies = user_ratings_count[user_ratings_count == max_movies].index[0]
+        user_rated_min_movies = user_ratings_count[user_ratings_count == min_movies].index[0]
+
+        print(f"Max movies rated by one user: {max_movies}, userId: {user_rated_max_movies}")
+        print(f"Min movies rated by one user: {min_movies}, userId: {user_rated_min_movies}")
+
+        return user_rated_max_movies, user_rated_min_movies
+    
+    @staticmethod
     def split_data_ml20m(gen_file, split_mode='random', test_ratio=0.2, random_seed=42):
         """
         Split dataset per user (20% ratings into test, rest into train).
@@ -45,6 +74,9 @@ class SampleRatings:
         - rating_train: DataFrame
         - rating_test: DataFrame
         """
+        if not isinstance(gen_file, pd.DataFrame):
+            raise ValueError("gen_file must be a pandas DataFrame")
+        
         np.random.seed(random_seed)
         train_rows = []
         test_rows = []
@@ -66,31 +98,3 @@ class SampleRatings:
         rating_train = pd.concat(train_rows).reset_index(drop=True)
         rating_test = pd.concat(test_rows).reset_index(drop=True)
         return rating_train, rating_test
-
-    def find_max_min_users_rated(self):
-        pass
-
-    def find_max_min_movies_rated(self, sampled_userIds=None):
-        """
-        Find user with max/min number of movies rated.
-        userIds: optional subset of users to consider.
-        Returns: (userId_max, userId_min)
-        """
-        if sampled_userIds:
-            df_ratings_subset = self.df_ratings[self.df_ratings['userId'].isin(sampled_userIds)]
-        else:
-            df_ratings_subset = self.df_ratings
-        
-        user_ratings_count = df_ratings_subset.groupby('userId')['rating'].count()
-        max_movies = user_ratings_count.max()
-        min_movies = user_ratings_count.min()
-
-        user_rated_max_movies = user_ratings_count[user_ratings_count == max_movies].index[0]
-        user_rated_min_movies = user_ratings_count[user_ratings_count == min_movies].index[0]
-
-        print(f"Max movies rated by one user: {max_movies}, userId: {user_rated_max_movies}")
-        print(f"Min movies rated by one user: {min_movies}, userId: {user_rated_min_movies}")
-
-        return user_rated_max_movies, user_rated_min_movies
-    
-
