@@ -4,7 +4,7 @@ import random
 from tqdm import tqdm
 
 class MovieMetadata:
-    def _init_(self, tmdb_metadata_path, df_genome_scores, df_genome_tags):
+    def __init__(self, tmdb_metadata_path, df_genome_scores, df_genome_tags):
         self.df_tmdb_metadata = pd.read_csv(tmdb_metadata_path) # DataFrame
         self.metadata = self.df_tmdb_metadata.set_index('movieId') # DataFrame with movieId as index
 
