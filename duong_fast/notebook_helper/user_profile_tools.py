@@ -7,11 +7,11 @@ from tqdm import tqdm
 class UserProfileTools:
     def __init__(self, user_profile):
         self.user_profile = user_profile # can be DataFrame or Dict
-        self.true_user_profile = self.user_profile.drop(self.user_profile.index[-1]) if isinstance(self.user_profile, dict) and self.user_profile.shape[0] == 6 else self.user_profile
-        self.df_user_profile = pd.DataFrame(self.true_user_profile) if isinstance(self.true_user_profile, dict) else self.user_profile
+        self.true_user_profile = self.user_profile.drop(self.user_profile.index[-1]) if self.user_profile.shape[0] == 6 else self.user_profile
+        self.df_user_profile = pd.DataFrame(self.true_user_profile)
 
         self.profile_userIds = list(user_profile.keys()) if isinstance(user_profile, dict) else self.user_profile.index.tolist()
-        self.user_serializable = {int(k): v for k, v in user_profile.items()} if isinstance(self.user_profile, dict) else None
+        self.user_serializable = {int(k): v for k, v in user_profile.items()}
 
     def print_nan_users(self):
         nan_users = self.true_user_profile.columns[self.true_user_profile.isnull().any()].tolist()
@@ -86,10 +86,6 @@ class UserProfileTools:
     def visualize_user_profile(self, print_out = False, return_nan = False):
         nan_users = []
         tag_counts = {}
-
-        if self.user_serializable is None:
-            print("User profiles are not serializable. Please convert them to a serializable format first.")
-            return None
     
         for user_id, profile in self.user_serializable.items():
 
@@ -105,9 +101,6 @@ class UserProfileTools:
         return nan_users if return_nan else None
 
     def check_user_profile(self, print_seq_503 = False, print_seq_429 = False):
-        if self.user_serializable is None:
-            print("User profiles are not serializable. Please convert them to a serializable format first.")
-            return None
         
         error_503_count = 0
         error_429_count = 0
