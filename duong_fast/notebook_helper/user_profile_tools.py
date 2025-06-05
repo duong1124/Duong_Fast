@@ -6,15 +6,18 @@ from tqdm import tqdm
 
 class UserProfileTools:
     def __init__(self, user_profile):
-        self.user_profile = user_profile
-        self.profile_userIds = list(user_profile.keys())
-        #self.nan_users = self.user_profile.columns[self.user_profile.isnull().any()].tolist()
-        
+        self.user_profile = user_profile # can be DataFrame or Dict
+        self.true_user_profile = self.user_profile.drop(self.user_profile.index[-1]) if isinstance(self.user_profile, dict) and self.user_profile.shape[0] == 6 else self.user_profile
+        self.df_user_profile = pd.DataFrame(self.true_user_profile) if isinstance(self.true_user_profile, dict) else self.user_profile
+
+        self.profile_userIds = list(user_profile.keys()) if isinstance(user_profile, dict) else self.user_profile.index.tolist()
+        self.user_serializable = {int(k): v for k, v in user_profile.items()} if isinstance(self.user_profile, dict) else None
+
     def print_nan_users(self):
-        nan_users = self.user_profile.columns[self.user_profile.isnull().any()].tolist()
+        nan_users = self.true_user_profile.columns[self.true_user_profile.isnull().any()].tolist()
         return nan_users
     
-    def plot_tag_distribution(self, method='boxplot', user_profile = None):
+    def plot_tag_distribution(self, method='boxplot', merge_10percent = True):
         """
         Plot tag distribution across 10 user groups.
 
@@ -22,9 +25,12 @@ class UserProfileTools:
           method: 'boxplot' or 'mean' or 'zero'
                   'zero' = plot distribution of users has zero tags
         """
-        Id_num_tags = {userId : len(self.user_profile[userId]['TopTagsWithScores']) if not isinstance(self.user_profile[userId]['TopTagsWithScores'], float) else 0 for userId in self.profile_userIds}
-
-        group_sizes = [1384] * 9 + [user_profile.shape[1] - 1384 * 9]
+        Id_num_tags = {userId : len(self.df_user_profile[userId]['TopTagsWithScores']) if not isinstance(self.df_user_profile[userId]['TopTagsWithScores'], float) else 0 for userId in self.profile_userIds}
+        
+        if merge_10percent: 
+            group_sizes = [1384] * 9 + [self.df_user_profile.shape[1] - 1384 * 9]
+        else:
+            group_sizes = 1384
 
         # each user_groups[i] will contain list[number of tags] * group_sizes[i]
         user_groups = []
@@ -76,6 +82,102 @@ class UserProfileTools:
         plt.grid(True, linestyle='--', alpha=0.5)
         plt.tight_layout()
         plt.show()
+
+    def visualize_user_profile(self, print_out = False, return_nan = False):
+        nan_users = []
+        tag_counts = {}
+
+        if self.user_serializable is None:
+            print("User profiles are not serializable. Please convert them to a serializable format first.")
+            return None
+    
+        for user_id, profile in self.user_serializable.items():
+
+            if "TopTagsWithScores" in profile and isinstance(profile["TopTagsWithScores"], list):
+                tag_counts[user_id] = len(profile["TopTagsWithScores"])
+                print(f"User {user_id}: {tag_counts[user_id]} TopTagsWithScores") if print_out else None
+            else:
+                print(f"User {user_id} has an error: {profile.get('error')}") if print_out else None # Print the error message if available
+                nan_users.append(user_id)
+
+        # Print the tag counts for each user
+        print(f"Number of nan users {len(nan_users)}")
+        return nan_users if return_nan else None
+
+    def check_user_profile(self, print_seq_503 = False, print_seq_429 = False):
+        if self.user_serializable is None:
+            print("User profiles are not serializable. Please convert them to a serializable format first.")
+            return None
+        
+        error_503_count = 0
+        error_429_count = 0
+        errored_users = []
+
+        consecutive_503_count = 0
+        max_consecutive_503 = 0
+        consecutive_503_sequences = []
+
+        consecutive_429_count = 0 
+        max_consecutive_429 = 0 
+        consecutive_429_sequences = [] 
+
+
+        for user_id, profile in self.user_serializable.items():
+            if "TopTagsWithScores" in profile and isinstance(profile["TopTagsWithScores"], list):
+                # Reset count if successful
+                consecutive_503_count = 0 
+                consecutive_429_count = 0 
+                continue
+
+            else:
+                errored_users.append(user_id)
+                error_message = profile.get("error")
+
+                if "503 UNAVAILABLE" in error_message:
+                    error_503_count += 1
+                    consecutive_503_count += 1
+                    consecutive_429_count = 0 # Reset 429 count on 503 error
+                    max_consecutive_503 = max(max_consecutive_503, consecutive_503_count)
+
+                    # Track consecutive sequences for 503
+                    if consecutive_503_count == 1:
+                        consecutive_503_sequences.append([user_id])
+                    else:
+                        consecutive_503_sequences[-1].append(user_id)
+
+                elif "429 RESOURCE_EXHAUSTED" in error_message:
+                    error_429_count += 1
+                    consecutive_429_count += 1 
+                    consecutive_503_count = 0 # Reset 503 count on 429 error
+                    max_consecutive_429 = max(max_consecutive_429, consecutive_429_count)
+
+                    # Track consecutive sequences for 429
+                    if consecutive_429_count == 1:
+                        consecutive_429_sequences.append([user_id])
+                    else:
+                        consecutive_429_sequences[-1].append(user_id)
+
+                else:
+                    consecutive_503_count = 0 # Reset count for 503 for other errors
+                    consecutive_429_count = 0 # Reset 429 count for other errors
+
+
+        print(f"Number of error 503 (UNAVAILABLE): {error_503_count}")
+        print(f"Number of error 429 (RESOURCE_EXHAUSTED): {error_429_count}")
+
+        print(f"Max consecutive 503 errors: {max_consecutive_503}")
+        if print_seq_503:
+            print("All sequence of 503 errors:")
+            for seq in consecutive_503_sequences:
+                if len(seq) > 1:
+                    print(f"  {seq}")
+
+        print(f"Max consecutive 429 errors: {max_consecutive_429}")
+        if print_seq_429:
+            print("All sequence of 429 errors:") 
+            for seq in consecutive_429_sequences:
+                if len(seq) > 1: 
+                    print(f"  {seq}")
 
 # Class for cleaning user profiles and converting them to paragraphs
 class CleanedUserProfile(UserProfileTools):
