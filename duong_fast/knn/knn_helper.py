@@ -234,7 +234,7 @@ def _calculate_ndcg(user_true_ratings, user_est_ratings, k):
     return ndcg
 
 @njit
-def dcg(ratings, order):
+def dcg(ratings, order, top_k_ranking_metric):
     """ Calculate discounted cumulative gain.
 
     Args:
