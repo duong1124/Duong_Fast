@@ -36,18 +36,18 @@ class GenUserProfile(MovieMetadata):
         self.userId_train = rating_train['userId'].unique()
     
     def split_userId_train(self, time_th = None, num_splits=100):
-        if self.time_th is None:
+        if self.time_th is None and time_th is None:
             raise ValueError("We are not generating user profiles here, or you forgot.")
         
-        if time_th is not None:
-            self.time_th = time_th
+        # Avoid modifying the original self.time_th
+        th = time_th if time_th is not None else self.time_th
 
         batch_size = len(self.userId_train) // num_splits
-        start_idx = (self.time_th - 1) * batch_size
-        if self.time_th == num_splits:
+        start_idx = (th - 1) * batch_size
+        if th == num_splits:
             userId_gen = self.userId_train[start_idx:]
         else:
-            end_idx = self.time_th * batch_size
+            end_idx = th * batch_size
             userId_gen = self.userId_train[start_idx:end_idx]
         return userId_gen
     
