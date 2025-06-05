@@ -156,7 +156,7 @@ class GenUserProfile(MovieMetadata):
 
         for user_id in tqdm(userId_gen, desc="Building user profiles", unit="user"):
             current_api_key = next(api_key_cycle) # Get the next API key from the cycle
-            user_id, profile = self.generate_user_profiles(user_id, current_api_key, nap = nap)
+            user_id, profile = self.generate_user_profile(user_id, current_api_key, nap = nap)
             user_profiles[user_id] = profile
             time.sleep(4)  # Rate limit for API calls
 
