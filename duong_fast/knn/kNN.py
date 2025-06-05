@@ -16,14 +16,17 @@ class kNN:
         verbose (boolean): Show predicting progress. Defaults to `False`.
         awareness_constrain (boolean): If `True`, the model must aware of all users and items in the test set, which means that these users and items are in the train set as well. This constrain helps speed up the predicting process (up to 1.5 times) but if a user of an item is unknown, kNN will fail to give prediction. Defaults to `False`.
         S (ndarray): Similarity matrix. Initialized to None.
+        top_k_ranking_metric (boolean): If `True`, the model will calculate the metrics (P@K, R@K, NDCG@K) by top-k ranking way, not ratings-based way. Defaults to `False`.
     """
-    def __init__(self, min_k=1, uuCF=False, verbose=False, awareness_constrain=False):
+    def __init__(self, min_k=1, uuCF=False, verbose=False, awareness_constrain=False, top_k_ranking_metric=False):
         self.min_k = min_k
 
         self.uuCF = uuCF
 
         self.verbose = verbose
         self.awareness_constrain = awareness_constrain
+
+        self.top_k_ranking_metric = top_k_ranking_metric
 
         self.S = None
 
@@ -157,6 +160,7 @@ class kNN:
             n_users = self.n_y
 
         # First map the predictions to each user.
+        # user_est_true[u_id] contains list of [predicted_rating, true_rating] pairs for user u_id
         user_est_true = [ [] for _ in range(n_users) ]
         for x_id, y_id, true_r, est in self.predictions:
             if self.uuCF:
@@ -170,7 +174,15 @@ class kNN:
         recalls = np.zeros(n_users)
 
         for u_id, user_ratings in enumerate(user_est_true):
-            precisions[u_id], recalls[u_id] = _calculate_precision_recall(np.array(user_ratings), k, threshold)
+            if len(user_ratings) > 0:
+                # Convert to numpy array and ensure it's 2D
+                ratings_array = np.array(user_ratings, dtype=np.float64)
+                if ratings_array.ndim == 1:
+                    ratings_array = ratings_array.reshape(1, -1)
+                precisions[u_id], recalls[u_id] = _calculate_precision_recall(ratings_array, k, threshold, self.top_k_ranking_metric)
+            else:
+                precisions[u_id] = 0.0
+                recalls[u_id] = 0.0
 
         precision = sum(prec for prec in precisions) / n_users
         recall = sum(rec for rec in recalls) / n_users

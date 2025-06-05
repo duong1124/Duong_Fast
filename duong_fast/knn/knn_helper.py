@@ -138,49 +138,65 @@ def _predict_baseline(x_id, y_id, x_rated_y, S, k, k_min, global_mean, bx, by):
     return est
 
 @njit
-def _calculate_precision_recall(user_ratings, k, threshold):
+def _calculate_precision_recall(user_ratings, k, threshold, top_k_ranking_metric):
     """Calculate the precision and recall at k metric for the user based on his/her obversed rating and his/her predicted rating.
 
     Args:
         user_ratings (ndarray): An array contains the predicted rating in the first column and the obversed rating in the second column.
         k (int): the k metric.
         threshold (float): relevant threshold.
-
+        top_k_ranking_metric (bool): use k (instead of n_rec_k) for precision.
     Returns:
         (precision, recall): the precision and recall score for the user.
     """
-    # Sort user ratings by estimated value
-    user_ratings = user_ratings[user_ratings[:, 0].argsort()][::-1]
+    n_ratings = len(user_ratings)
+    if n_ratings == 0:
+        return 0.0, 0.0
+        
+    pred_ratings = np.zeros(n_ratings)
+    true_ratings = np.zeros(n_ratings)
+    
+    for i in range(n_ratings):
+        pred_ratings[i] = user_ratings[i][0]
+        true_ratings[i] = user_ratings[i][1]
+    
+    # Sort by predicted ratings
+    sort_idx = np.argsort(pred_ratings)[::-1]
+    pred_ratings = pred_ratings[sort_idx]
+    true_ratings = true_ratings[sort_idx]
 
     # Number of relevant items
-    n_rel = 0
-    for _, true_r in user_ratings:
-        if true_r >= threshold:
-            n_rel += 1
+    n_rel = np.sum(true_ratings[:min(k, n_ratings)] >= threshold)
+    n_rel_top_k = np.sum(true_ratings >= threshold) # for top k ranking, this is n_rel on whole test set
 
-    # Number of recommended items in top k
-    n_rec_k = 0
-    for est, _ in user_ratings[:k]:
-        if est >= threshold:
-            n_rec_k += 1
+    # Number of recommended items
+    n_rec_k = np.sum(pred_ratings[:min(k, n_ratings)] >= threshold)
 
     # Number of relevant and recommended items in top k
     n_rel_and_rec_k = 0
-    for (est, true_r) in user_ratings[:k]:
-        if true_r >= threshold and est >= threshold:
-            n_rel_and_rec_k += 1
+    if top_k_ranking_metric:
+        n_rel_and_rec_k = n_rel # = true_ratings >= threshold in first k rec by predicted ratings
+    else:
+        n_rel_and_rec_k = np.sum((true_ratings[:min(k, n_ratings)] >= threshold) & \
+                         (pred_ratings[:min(k, n_ratings)] >= threshold))
 
     # Precision@K: Proportion of recommended items that are relevant
     # When n_rec_k is 0, Precision is undefined. We here set it to 0.
     if n_rec_k != 0:
-        precision = n_rel_and_rec_k / n_rec_k
+        if top_k_ranking_metric:
+            precision = n_rel_and_rec_k / k
+        else:
+            precision = n_rel_and_rec_k / n_rec_k
     else:
         precision = 0
 
     # Recall@K: Proportion of relevant items that are recommended
     # When n_rel is 0, Recall is undefined. We here set it to 0.
     if n_rel != 0:
-        recall = n_rel_and_rec_k / n_rel
+        if top_k_ranking_metric:
+            recall = n_rel_and_rec_k / n_rel_top_k
+        else:
+            recall = n_rel_and_rec_k / n_rel
     else:
         recall = 0
 
@@ -198,16 +214,27 @@ def _calculate_ndcg(user_true_ratings, user_est_ratings, k):
     Returns:
         ndcg: the ndcg score for the user.
     """
-    # Sort user ratings by estimated value
-    user_true_ratings_order = user_true_ratings.argsort()[::-1][:k]
-    user_est_ratings_order = user_est_ratings.argsort()[::-1][:k]
+    n_ratings = len(user_true_ratings)
+    if n_ratings == 0:
+        return 0.0
+        
+    # Sort ratings by true and predicted values
+    true_order = np.argsort(user_true_ratings)[::-1][:min(k, n_ratings)]
+    est_order = np.argsort(user_est_ratings)[::-1][:min(k, n_ratings)]
 
-    ndcg = dcg(user_est_ratings, user_est_ratings_order) / dcg(user_true_ratings, user_true_ratings_order)
+    # Calculate DCG for both true and predicted ratings
+    true_dcg = dcg(user_true_ratings, true_order)
+    est_dcg = dcg(user_est_ratings, est_order)
 
+    # Avoid division by zero
+    if true_dcg == 0:
+        return 0.0
+        
+    ndcg = est_dcg / true_dcg
     return ndcg
 
 @njit
-def dcg(ratings, order):
+def dcg(ratings, order, top_k_ranking_metric):
     """ Calculate discounted cumulative gain.
 
     Args:
@@ -217,8 +244,7 @@ def dcg(ratings, order):
     Returns:
         float: the discounted cumulative gain of the user.
     """
-    dcg = 0
+    dcg_score = 0.0
     for ith, item in enumerate(order):
-        dcg += (np.power(2, ratings[item]) - 1) / np.log2(ith + 2)
-
-    return dcg
+        dcg_score += (np.power(2, ratings[item]) - 1) / np.log2(ith + 2)
+    return dcg_score
