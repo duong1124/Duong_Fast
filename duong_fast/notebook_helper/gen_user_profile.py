@@ -35,9 +35,12 @@ class GenUserProfile(MovieMetadata):
         self.gen_users_path = gen_users_path
         self.userId_train = rating_train['userId'].unique()
     
-    def split_userId_train(self, num_splits=100):
+    def split_userId_train(self, time_th = None, num_splits=100):
         if self.time_th is None:
             raise ValueError("We are not generating user profiles here, or you forgot.")
+        
+        if time_th is not None:
+            self.time_th = time_th
 
         batch_size = len(self.userId_train) // num_splits
         start_idx = (self.time_th - 1) * batch_size
@@ -47,6 +50,13 @@ class GenUserProfile(MovieMetadata):
             end_idx = self.time_th * batch_size
             userId_gen = self.userId_train[start_idx:end_idx]
         return userId_gen
+    
+    def all_userId_gen(self):
+        remainder = (self.time_th % 10) if (self.time_th % 10) != 0 else 10
+
+        for i in range(remainder, 101, 10):
+              print(f"{i}_th time: {self.split_userId_train(i, num_splits=100)} ")
+
 
     def generate_user_profile(self, user_id, api_key, nap = True, prompt_template=None):
         user_ratings = self.rating_train[self.rating_train['userId'] == user_id]
@@ -152,11 +162,10 @@ class GenUserProfile(MovieMetadata):
 
         return user_profiles
 
-    def saving_user_profile(self, gen_users_path = None):
+    def save_user_profiles(self, user_profiles, gen_users_path = None):
         if gen_users_path is None:
             gen_users_path = self.gen_users_path
 
-        user_profiles = self.build_user_profiles()
         filename = f"user_1384_{self.time_th}_{self.num_top_movies}_{self.num_top_tags}.json"
         user_profiles_serializable = {int(k): v for k, v in user_profiles.items()}
 
