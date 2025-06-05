@@ -147,7 +147,7 @@ class GenUserProfile(MovieMetadata):
                 time.sleep(30)
             return user_id, {"error": f"Failed to generate profile: {str(e)}"}
 
-    def build_user_profiles(self, userId_gen = None):
+    def build_user_profiles(self, userId_gen = None, nap = True):
         if userId_gen is None:
             userId_gen = self.split_userId_train()
 
@@ -156,7 +156,7 @@ class GenUserProfile(MovieMetadata):
 
         for user_id in tqdm(userId_gen, desc="Building user profiles", unit="user"):
             current_api_key = next(api_key_cycle) # Get the next API key from the cycle
-            user_id, profile = self.generate_user_profiles(user_id, current_api_key)
+            user_id, profile = self.generate_user_profiles(user_id, current_api_key, nap = nap)
             user_profiles[user_id] = profile
             time.sleep(4)  # Rate limit for API calls
 
