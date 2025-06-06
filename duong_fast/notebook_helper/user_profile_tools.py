@@ -242,11 +242,12 @@ class CleanedUserProfile(UserProfileTools):
             self.cleaned_user_profile.at[userId, 'ProfileParagraph'] = paragraph
         return self.cleaned_user_profile
 
-    def print_profile(self):
-        return self.cleaned_user_profile
-
-    def print_a_profile(self):
-        userId = random.choice(self.userIds)
+    def print_profile(self, userId=None):
+        """
+        Print a single user's profile paragraph. If userId is None, pick a random user.
+        """
+        if userId is None:
+            userId = random.choice(self.userIds)
         print(f"userId: {userId}")
         print(self.cleaned_user_profile.loc[userId, 'ProfileParagraph'])
 
