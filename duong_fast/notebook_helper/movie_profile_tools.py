@@ -5,8 +5,8 @@ from tqdm import tqdm
 
 class MovieMetadata:
     def __init__(self, tmdb_metadata_path, df_genome_scores, df_genome_tags):
-        self.df_tmdb_metadata = pd.read_csv(tmdb_metadata_path) # DataFrame
-        self.metadata = self.df_tmdb_metadata.set_index('movieId') # DataFrame with movieId as index
+        self.movie_profile = pd.read_csv(tmdb_metadata_path, index_col = 0) # DataFrame
+        self.metadata = self.movie_profile.set_index('movieId') # DataFrame with movieId as index
 
         self.df_genome_scores = df_genome_scores 
 
@@ -14,8 +14,8 @@ class MovieMetadata:
         self.tag_mapping = dict(zip(self.df_genome_tags["tagId"], self.df_genome_tags["tag"]))
 
     def check_null(self):
-        for col in self.df_tmdb_metadata.columns:
-            null_count = self.df_tmdb_metadata[col].isnull().sum()
+        for col in self.movie_profile.columns:
+            null_count = self.movie_profile[col].isnull().sum()
             print(f"Column '{col}': {null_count} null values")
 
     def _get_title(self, movie_id):
@@ -109,8 +109,8 @@ class MovieMetadata:
 class CleanedMovieProfile(MovieMetadata):
     def __init__(self, tmdb_metadata_path, movie_profile_csv, df_genome_scores, df_genome_tags, df_ratings, num_tags):
         super().__init__(tmdb_metadata_path, df_genome_scores, df_genome_tags)
-        if tmdb_metadata_path is None and movie_profile_csv is not None:
-            self.df_tmdb_metadata = movie_profile_csv
+        if movie_profile_csv is not None:
+            self.movie_profile = movie_profile_csv
         self.df_ratings = df_ratings
         self.num_tags = num_tags
         self.movieIds = list(df_ratings['movieId'].unique())
@@ -134,11 +134,17 @@ class CleanedMovieProfile(MovieMetadata):
             tags_scores[movieId] = text_tags_score
         return tags_scores
 
-    def _profile_to_paragraph(self):
+    def _profile_to_paragraph(self, using_description=False):
         tags_scores = self._get_tags()
         for movieId in tqdm(self.movieIds, desc="Creating movie paragraphs", unit="movie"):
             paragraph = self.get_paragraph(movieId)
             paragraph += f" TopTagsWithScores: {tags_scores[movieId]}"
+
+            if using_description:
+                description = self.movie_profile.loc[movieId, 'description']
+                if pd.notnull(description) and description != '':
+                    paragraph += f" Description: {description}"
+                    
             self.cleaned_movie_profile.loc[movieId, 'ProfileParagraph'] = paragraph
             
         return self.cleaned_movie_profile

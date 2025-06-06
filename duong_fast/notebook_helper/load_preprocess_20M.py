@@ -6,19 +6,27 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 class LoadPreprocess20M:
-    def dataload(self, dataset_url="http://files.grouplens.org/datasets/movielens/ml-20m.zip", dataset_path="ml-20m.zip", extract_path="ml-20m"):
+    def dataload(self, dataset_url="http://files.grouplens.org/datasets/movielens/ml-20m.zip", dataset_path="ml-20m.zip", extract_path="ml-20m", local=False):
         """
         Download and extract the MovieLens 20M dataset, then load all CSV files into pandas DataFrames.
+        If local=True, load from local folder (ml-20m/ml-20m/) and skip download/extract.
         Returns: df_movies, df_genome_scores, df_tags, df_genome_tags, df_ratings, df_links
         """
-        if not os.path.exists(dataset_path):
-            urllib.request.urlretrieve(dataset_url, dataset_path)
-
-        if not os.path.exists(extract_path):
-            with zipfile.ZipFile(dataset_path, "r") as zip_ref:
-                zip_ref.extractall(extract_path)
-
-        base = os.path.join(extract_path, "ml-20m")
+        if local:
+            base = os.path.join("ml-20m", "ml-20m")
+            required_files = [
+                "movies.csv", "genome-scores.csv", "tags.csv", "genome-tags.csv", "ratings.csv", "links.csv"
+            ]
+            missing = [f for f in required_files if not os.path.exists(os.path.join(base, f))]
+            if missing:
+                raise FileNotFoundError(f"Missing required files in {base}: {missing}\nPlease ensure all MovieLens 20M CSVs are present.")
+        else:
+            if not os.path.exists(dataset_path):
+                urllib.request.urlretrieve(dataset_url, dataset_path)
+            if not os.path.exists(extract_path):
+                with zipfile.ZipFile(dataset_path, "r") as zip_ref:
+                    zip_ref.extractall(extract_path)
+            base = os.path.join(extract_path, "ml-20m")
 
         df_movies = pd.read_csv(os.path.join(base, "movies.csv"))
         df_genome_scores = pd.read_csv(os.path.join(base, "genome-scores.csv"))
