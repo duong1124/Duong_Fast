@@ -3,6 +3,7 @@ import numpy as np
 import random
 import pandas as pd
 from tqdm import tqdm
+import json
 
 class UserProfileTools:
     def __init__(self, user_profile):
@@ -169,6 +170,15 @@ class UserProfileTools:
                 if len(seq) > 1: 
                     print(f"  {seq}")
 
+    @staticmethod
+    def save_user_profile(final_user_profile, output_):
+        # Convert to dict -> save as json file without datatype error
+        final_user_json = final_user_profile.to_dict(orient='index')
+
+        output_file = 'completed_user_profile.json'
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(final_user_json, f, indent=2, ensure_ascii=False)
+
 # Class for cleaning user profiles and converting them to paragraphs
 class CleanedUserProfile(UserProfileTools):
     def __init__(self, user_profile):
@@ -242,7 +252,7 @@ class CleanedUserProfile(UserProfileTools):
             self.cleaned_user_profile.at[userId, 'ProfileParagraph'] = paragraph
         return self.cleaned_user_profile
 
-    def print_profile(self, userId=None):
+    def print_a_profile(self, userId=None):
         """
         Print a single user's profile paragraph. If userId is None, pick a random user.
         """

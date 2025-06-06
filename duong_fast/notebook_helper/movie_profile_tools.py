@@ -5,8 +5,7 @@ from tqdm import tqdm
 
 class MovieMetadata:
     def __init__(self, tmdb_metadata_path, df_genome_scores, df_genome_tags):
-        self.movie_profile = pd.read_csv(tmdb_metadata_path, index_col = 0) # DataFrame
-        self.metadata = self.movie_profile.set_index('movieId') # DataFrame with movieId as index
+        self.movie_profile = pd.read_csv(tmdb_metadata_path, index_col = 'movieId') # DataFrame
 
         self.df_genome_scores = df_genome_scores 
 
@@ -19,27 +18,27 @@ class MovieMetadata:
             print(f"Column '{col}': {null_count} null values")
 
     def _get_title(self, movie_id):
-        title = self.metadata.loc[movie_id, 'title']
+        title = self.movie_profile.loc[movie_id, 'title']
         return title
 
     def _get_genres(self, movie_id):
-        genres_list = self.metadata.loc[movie_id, 'genres'].split('|')
+        genres_list = self.movie_profile.loc[movie_id, 'genres'].split('|')
         return ", ".join(genres_list)  # Join genres with commas
 
     def _get_actors(self, movie_id):
-        actors_str = self.metadata.loc[movie_id, 'actors']
+        actors_str = self.movie_profile.loc[movie_id, 'actors']
         if pd.isnull(actors_str) or actors_str == '':
             return ""
         return actors_str
 
     def _get_director(self, movie_id):
-        director_str = self.metadata.loc[movie_id, 'director']
+        director_str = self.movie_profile.loc[movie_id, 'director']
         if pd.isnull(director_str) or director_str == '':
             return ""
         return director_str
 
     def _get_year(self, movie_id):
-        title = self.metadata.loc[movie_id, 'title']
+        title = self.movie_profile.loc[movie_id, 'title']
         match = re.search(r"\((\d{4})\)", title)  # Find year in parentheses
         if match:
             return match.group(1)  # Return the year if found
