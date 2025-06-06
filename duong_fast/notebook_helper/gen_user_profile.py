@@ -58,7 +58,7 @@ class GenUserProfile(MovieMetadata):
               print(f"{i}_th time: {self.split_userId_train(i, num_splits=100)} ")
 
 
-    def generate_user_profile(self, user_id, api_key, nap = True, prompt_template=None):
+    def generate_user_profile(self, user_id, api_key, nap = 15, prompt_template=None):
         user_ratings = self.rating_train[self.rating_train['userId'] == user_id]
 
         # Sort by rating and limit to top movies if specified
@@ -144,10 +144,10 @@ class GenUserProfile(MovieMetadata):
 
         except Exception as e:
             if nap:
-                time.sleep(30)
+                time.sleep(nap)
             return user_id, {"error": f"Failed to generate profile: {str(e)}"}
 
-    def build_user_profiles(self, userId_gen = None, nap = True):
+    def build_user_profiles(self, userId_gen = None, nap = 15):
         if userId_gen is None:
             userId_gen = self.split_userId_train()
 

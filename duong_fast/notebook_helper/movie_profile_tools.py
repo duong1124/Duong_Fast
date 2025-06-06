@@ -107,8 +107,10 @@ class MovieMetadata:
             return None
 
 class CleanedMovieProfile(MovieMetadata):
-    def __init__(self, tmdb_metadata_path, df_genome_scores, df_genome_tags, df_ratings, num_tags):
+    def __init__(self, tmdb_metadata_path, movie_profile_csv, df_genome_scores, df_genome_tags, df_ratings, num_tags):
         super().__init__(tmdb_metadata_path, df_genome_scores, df_genome_tags)
+        if tmdb_metadata_path is None and movie_profile_csv is not None:
+            self.df_tmdb_metadata = movie_profile_csv
         self.df_ratings = df_ratings
         self.num_tags = num_tags
         self.movieIds = list(df_ratings['movieId'].unique())

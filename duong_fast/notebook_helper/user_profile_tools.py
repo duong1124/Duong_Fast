@@ -17,7 +17,7 @@ class UserProfileTools:
         nan_users = self.true_user_profile.columns[self.true_user_profile.isnull().any()].tolist()
         return nan_users
     
-    def plot_tag_distribution(self, method='boxplot', merge_10percent = True):
+    def plot_tag_distribution(self, method='boxplot'):
         """
         Plot tag distribution across 10 user groups.
 
@@ -27,10 +27,7 @@ class UserProfileTools:
         """
         Id_num_tags = {userId : len(self.df_user_profile[userId]['TopTagsWithScores']) if not isinstance(self.df_user_profile[userId]['TopTagsWithScores'], float) else 0 for userId in self.profile_userIds}
         
-        if merge_10percent: 
-            group_sizes = [1384] * 9 + [self.df_user_profile.shape[1] - 1384 * 9]
-        else:
-            group_sizes = 1384
+        group_sizes = [1384] * 9 + [self.df_user_profile.shape[1] - 1384 * 9]
 
         # each user_groups[i] will contain list[number of tags] * group_sizes[i]
         user_groups = []
