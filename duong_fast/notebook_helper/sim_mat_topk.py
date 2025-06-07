@@ -161,7 +161,7 @@ def ndcg_at_k(df_user_movie, rating_test, k):
         user_test_ratings = rating_test[rating_test['userId'] == userId]
         user_sim = df_user_movie.loc[userId].sort_values(ascending=False)
 
-        ndcg_sum += calculate_ndcg_from_similarity(user_sim, user_test_ratings, userId, k)
+        ndcg_sum += calculate_ndcg_from_similarity(user_sim, user_test_ratings, k)
 
     avg_ndcg = ndcg_sum / n_users if n_users > 0 else 0.0
 
