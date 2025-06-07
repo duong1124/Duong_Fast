@@ -4,6 +4,7 @@ import time
 import json
 from tqdm import tqdm
 import pandas as pd
+import numpy as np
 import os
 
 from notebook_helper import MovieMetadata
@@ -225,3 +226,141 @@ class GenUserProfile(MovieMetadata):
             max_retries=max_retries,
             attempt=attempt + 1
         )
+    
+    @staticmethod
+    # Incase the tag_scores that LLM generate is not good, we will consider assigning user favorite tags with revelance scores as average of top movies they watched
+    def calculate_user_genome_scores(df_ratings, df_genome_scores, userIds):
+        # if we don't take subset, we take all users
+        if userIds is None:
+            userIds = df_ratings['userId'].unique()
+        n_users = len(userIds)
+
+        df_genome_scores_pivot = df_genome_scores.pivot(index='movieId', columns='tagId', values='relevance')
+
+        dim_genome = df_genome_scores_pivot.shape[1]
+        user_genome_matrix = np.zeros((n_users, dim_genome))
+
+        for i, userId in enumerate(userIds):
+            user_ratings = df_ratings[df_ratings['userId'] == userId]
+
+            # movie_indices = user_ratings[:, 1]
+            # ratings = user_ratings[:, 2]
+
+            movie_indices = user_ratings['movieId'].values.astype(int)
+            ratings = user_ratings['rating'].values
+
+            normalized_ratings = ratings / 5.0
+
+            user_genome_matrix[i] = np.sum(normalized_ratings[:, None] * df_genome_scores_pivot.loc[movie_indices], axis=0) / len(movie_indices)
+
+        return user_genome_matrix
+    
+    @staticmethod
+    def detect_json_errors(df: pd.DataFrame, output_path: str) -> list[str]:
+        """
+        Detect errors in JSON data loaded into a DataFrame, remove the erroneous user entries,
+        and save the cleaned data to a new JSON file.
+
+        Parameters:
+        - df: DataFrame with user IDs as index and columns for user data.
+        - output_path: Path to save the cleaned JSON data.
+
+        Returns:
+        - List of user IDs with errors (missing keys, empty lists, or invalid types).
+        """
+        expected_keys = {
+            'FavoriteDecade': str,
+            'FavoriteGenres': list,
+            'FavoriteActors': list,
+            'FavoriteDirectors': list,
+            'TopTagsWithScores': list
+        }
+
+        error_ids = []
+
+        # Check for missing columns
+        missing_columns = [key for key in expected_keys if key not in df.columns] # check if expected_keys not in cols, if yes -> add to list
+        if missing_columns:
+            error_ids = df.index.astype(str).tolist()
+            cleaned_df = df.drop(index=error_ids)
+            cleaned_df.to_json(output_path, orient='index', indent=2)
+            return sorted(list(set(error_ids)))
+
+        for user_id, row in df.iterrows():
+            for key, expected_type in expected_keys.items():
+                value = row.get(key)
+                # na
+                if pd.isna(value):
+                    error_ids.append(str(user_id))
+                    break
+                # wrong type
+                if not isinstance(value, expected_type):
+                    error_ids.append(str(user_id))
+                    break
+                # if expected_type = list but empty
+                if expected_type == list and not value:
+                    error_ids.append(str(user_id))
+                    break
+
+                if key == 'TopTagsWithScores':
+                    if not all(
+                        isinstance(item, dict) and
+                        isinstance(item.get('tag'), str) and
+                        isinstance(item.get('score'), (int, float))
+                        for item in value
+                    ):
+                        error_ids.append(str(user_id))
+                        break
+
+        # Remove error rows from the DataFrame
+        cleaned_df = df[~df.index.astype(str).isin(error_ids)]
+
+        # Save cleaned data to JSON
+        cleaned_df.to_json(output_path, orient='index', indent=2)
+
+        return sorted(list(set(error_ids)))
+    
+    @staticmethod
+    def combine_and_sort_json_files(folder_path):
+        # Initialize an empty list to store DataFrames
+        dfs = []
+
+        # Ensure the folder path exists
+        folder = Path(folder_path)
+        if not folder.is_dir():
+            raise ValueError(f"The path {folder_path} is not a valid directory")
+
+        # Iterate through all JSON files in the folder
+        for file_path in folder.glob("*.json"):
+            try:
+                # Read JSON file into a DataFrame with user IDs as index
+                data = pd.read_json(file_path, orient='index')
+                dfs.append(data)
+            except ValueError as e:
+                print(f"Error decoding JSON in {file_path}: {e}")
+            except Exception as e:
+                print(f"Error reading {file_path}: {e}")
+
+        if not dfs:
+            raise ValueError("No valid JSON files found in the directory")
+
+        # Concatenate all DataFrames
+        combined_df = pd.concat(dfs)
+
+        # Reset index to make user ID a column, then sort by user ID
+        combined_df = combined_df.reset_index().rename(columns={'index': 'userId'})
+        combined_df['userId'] = combined_df['userId'].astype(int)  # Ensure userId is numeric
+        sorted_df = combined_df.sort_values(by='userId')
+
+        # Set userId back as the index for JSON output
+        sorted_df = sorted_df.set_index('userId')
+
+        # Save the combined and sorted DataFrame as a new JSON file in the same folder
+        output_path = folder / "combined_sorted_users_pandas.json"
+        try:
+            sorted_df.to_json(output_path, orient='index', indent=4)
+            print(f"Combined and sorted data saved to {output_path}")
+        except Exception as e:
+            print(f"Error saving combined data to {output_path}: {e}")
+
+        return sorted_df

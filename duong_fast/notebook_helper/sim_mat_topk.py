@@ -37,7 +37,6 @@ def sim_descriptive(df_user_movie):
     # Remove NaNs if any
     all_values = all_values[~np.isnan(all_values)]
 
-    # Compute summary statistics
     global_stats = {
         'count': len(all_values),
         'mean': np.mean(all_values),
@@ -51,43 +50,32 @@ def sim_descriptive(df_user_movie):
 
     display(pd.DataFrame(global_stats, index=['Overall']))
 
-def calculate_precision_recall_from_similarity(df_user_movie, rating_test, userId, k, threshold=3.5):
+def calculate_precision_recall_from_similarity(user_sim, user_test_ratings, k, threshold=3.5):
     """
     Calculate precision and recall at k using similarity scores for a specific user.
 
     """
-    # Get user's actual ratings from test set
-    user_test_ratings = rating_test[rating_test['userId'] == userId]
-
     n_ratings = len(user_test_ratings)
 
     if n_ratings == 0:
         return 0.0, 0.0
-
+    
     # Create a set of relevant movies (true_ratings > threshold)
-    relevant_movies = set()
-    movieId_user_rated = [int(id) for id in user_test_ratings.iloc[:, 1]]
-
-    for i in range(n_ratings):
-        rating_user_rated = user_test_ratings.iloc[i, 2]
-        if rating_user_rated >= threshold:
-            relevant_movies.add(int(movieId_user_rated[i]))
+    relevant_movies = set(user_test_ratings[user_test_ratings.iloc[:, 2] >= threshold].iloc[:, 1].astype(int))
 
     n_rel = len(relevant_movies)
     if n_rel == 0:
         return 0.0, 0.0
 
     # Taking top similarity for top_k_recs, AS WE TAKE SUBSET OF USER_SIM FROM MOVIEID USER HAVE RATED IN TEST SET
-    user_sim = df_user_movie.loc[userId].sort_values(ascending=False)
-    user_sim = user_sim[user_sim.index.astype(int).isin(movieId_user_rated)]
+    movieId_user_rated_test = [int(id) for id in user_test_ratings.iloc[:, 1]]
+    user_sim = user_sim[user_sim.index.astype(int).isin(movieId_user_rated_test)]
 
-    top_k_recs = set(user_sim.index[:k])
-    top_k_recs = set([int(x) for x in top_k_recs])
+    top_k_recs = set(int(x) for x in user_sim.index[:k])
 
     # Find intersection of relevant and recommended items
     n_rel_and_rec_k = len(list(top_k_recs & relevant_movies))
 
-    # Calculate precision and recall
     precision = n_rel_and_rec_k / k
     recall = n_rel_and_rec_k / n_rel
 
@@ -107,41 +95,36 @@ def precision_recall_at_k(df_user_movie, rating_test, k, threshold=3.5):
     recalls = np.zeros(n_users)
 
     for userId in userIds:
-        precisions[userIds_mapping[userId]], recalls[userIds_mapping[userId]] = calculate_precision_recall_from_similarity(df_user_movie, rating_test, userId, k, threshold)
+        user_test_ratings = rating_test[rating_test['userId'] == userId]
+        user_sim = df_user_movie.loc[userId].sort_values(ascending=False)
 
-    precision = sum(prec for prec in precisions) / n_users
-    recall = sum(rec for rec in recalls) / n_users
+        precisions[userIds_mapping[userId]], recalls[userIds_mapping[userId]] = calculate_precision_recall_from_similarity(user_sim, user_test_ratings, k, threshold)
+
+    precision = sum(prec for prec in precisions) / n_users if n_users > 0 else 0.0
+    recall = sum(rec for rec in recalls) / n_users if n_users > 0 else 0.0
 
     print(f"Precision@{k}: {precision:.5f} - Recall@{k}: {recall:.5f}")
 
     return precision, recall
 
-def calculate_ndcg_from_similarity(df_user_movie, rating_test, userId, k):
+def calculate_ndcg_from_similarity(user_sim, user_test_ratings, k):
     """
     Calculate NDCG@K using similarity scores for a specific user.
 
     """
-    user_test_ratings = rating_test[rating_test['userId'] == userId]
-
     if len(user_test_ratings) == 0:
         return 0.0
 
-    movieId_user_rated = [int(id) for id in user_test_ratings.iloc[:, 1]]
-
     # movie_ratings = {movie_id : rating}
-    movie_ratings = {}
-    for i in range(len(user_test_ratings)):
-        movie_id = int(user_test_ratings.iloc[i, 1])
-        rating = user_test_ratings.iloc[i, 2]
-        movie_ratings[movie_id] = rating
+    movie_ratings = dict(zip(user_test_ratings.iloc[:, 1].astype(int), user_test_ratings.iloc[:, 2]))
 
-    user_sim = df_user_movie.loc[userId].sort_values(ascending=False)
-    user_sim = user_sim[user_sim.index.astype(int).isin(movieId_user_rated)]
+    # Similarly, we take only subset of user_sim from movieId user have rated in test set
+    movieId_user_rated_test = [int(id) for id in user_test_ratings.iloc[:, 1]]
+    user_sim = user_sim[user_sim.index.astype(int).isin(movieId_user_rated_test)]
 
-    top_k_recs = list(user_sim.index[:k])
-    top_k_recs = [int(x) for x in top_k_recs]
+    top_k_recs = set(int(x) for x in user_sim.index[:k])
 
-    # Calculate DCG@K
+    # DCG@K
     dcg = 0.0
     for i, movie_id in enumerate(top_k_recs):
         if movie_id in movie_ratings:
@@ -156,7 +139,7 @@ def calculate_ndcg_from_similarity(df_user_movie, rating_test, userId, k):
     for i in range(min(k, len(ideal_ranking))):
         idcg += ideal_ranking[i] / np.log2(i + 2)
 
-    # Calculate NDCG
+    # NDCG
     if idcg > 0:
         ndcg = dcg / idcg
     else:
@@ -175,7 +158,10 @@ def ndcg_at_k(df_user_movie, rating_test, k):
     ndcg_sum = 0.0
 
     for userId in userIds:
-        ndcg_sum += calculate_ndcg_from_similarity(df_user_movie, rating_test, userId, k)
+        user_test_ratings = rating_test[rating_test['userId'] == userId]
+        user_sim = df_user_movie.loc[userId].sort_values(ascending=False)
+
+        ndcg_sum += calculate_ndcg_from_similarity(user_sim, user_test_ratings, userId, k)
 
     avg_ndcg = ndcg_sum / n_users if n_users > 0 else 0.0
 

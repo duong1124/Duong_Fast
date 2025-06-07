@@ -106,7 +106,14 @@ class MovieMetadata:
             return None
 
 class CleanedMovieProfile(MovieMetadata):
-    def __init__(self, tmdb_metadata_path, movie_profile_csv, df_genome_scores, df_genome_tags, df_ratings, num_tags):
+    """A class to create a cleaned movie profile with metadata and genome tags.
+    It generates a paragraph for each movieId containing its metadata and top genome tags.
+
+    - using_description: 'no' - do not use description,
+                        'only' - use only description, 
+                        'add' - add description to the paragraph
+    """
+    def __init__(self, tmdb_metadata_path, movie_profile_csv, df_genome_scores, df_genome_tags, df_ratings, num_tags, using_description= 'no'):
         super().__init__(tmdb_metadata_path, df_genome_scores, df_genome_tags)
         if movie_profile_csv is not None:
             self.movie_profile = movie_profile_csv
@@ -115,6 +122,7 @@ class CleanedMovieProfile(MovieMetadata):
         self.movieIds = list(df_ratings['movieId'].unique())
         self.cleaned_movie_profile = pd.DataFrame(index=self.movieIds, columns=['ProfileParagraph'])
         self.cleaned_movie_profile = self._profile_to_paragraph()
+        self.using_description = using_description 
 
     def __repr__(self):
         return repr(self.cleaned_movie_profile)
@@ -132,20 +140,24 @@ class CleanedMovieProfile(MovieMetadata):
             text_tags_score = ", ".join([f"{tag} : {relevance:.4f}" for tag, relevance in genome_tags])
             tags_scores[movieId] = text_tags_score
         return tags_scores
-
-    def _profile_to_paragraph(self, using_description=False):
+    
+    def _profile_to_paragraph(self):
         tags_scores = self._get_tags()
         for movieId in tqdm(self.movieIds, desc="Creating movie paragraphs", unit="movie"):
             paragraph = self.get_paragraph(movieId)
             paragraph += f" TopTagsWithScores: {tags_scores[movieId]}"
 
-            if using_description:
+            description = None
+            if 'description' in self.movie_profile.columns:
                 description = self.movie_profile.loc[movieId, 'description']
-                if pd.notnull(description) and description != '':
-                    paragraph += f" Description: {description}"
-                    
+
+            if self.using_description == 'only' and description is not None and pd.notnull(description) and description != '':
+                paragraph = f"Description: {description}"
+            elif self.using_description == 'add' and description is not None and pd.notnull(description) and description != '':
+                paragraph += f" Description: {description}"
+
             self.cleaned_movie_profile.loc[movieId, 'ProfileParagraph'] = paragraph
-            
+
         return self.cleaned_movie_profile
 
     def print_a_profile(self):
